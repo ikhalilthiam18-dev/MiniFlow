@@ -34,6 +34,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  changePassword,
+  clearSession,
+  createAdminUser,
+  createContact,
+  createCourrier,
+  fetchAccounts,
+  fetchAdminUsers,
+  fetchContacts,
+  fetchCourriers,
+  fetchMe,
+  fetchNotifications,
+  getStoredAccessToken,
+  login as apiLogin,
+  markAllNotificationsRead,
+  markNotificationRead,
+  patchAdminUser,
+  patchCourrier,
+  updateProfileAvatar,
+  type ApiUser,
+} from "@/lib/api";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -72,19 +93,7 @@ type Contact = {
   email: string;
   telephone: string;
 };
-type AppUser = {
-  id: number;
-  nom: string;
-  email: string;
-  role:
-    | "Administrateur système"
-    | "Secrétariat général / Bureau du courrier"
-    | "DGS / Secrétaire municipal"
-    | "Chef de service municipal"
-    | "Agent communal";
-  service: string;
-  actif: boolean;
-};
+type AppUser = ApiUser;
 type AppNotification = {
   id: number;
   destinataire: string;
@@ -104,167 +113,15 @@ const services = [
   "Finances",
   "Direction générale",
 ];
-const seed: Courrier[] = [
-  {
-    id: 1,
-    numero: "ARR-2026-0048",
-    sens: "Arrivée",
-    date: "2026-08-27",
-    tiers: "Préfecture de Rufisque",
-    objet: "Transmission du contrôle de légalité — délibération n°18",
-    service: "Direction générale",
-    type: "Recommandé",
-    priorite: "Urgente",
-    statut: "Ventilé",
-    echeance: "2026-08-29",
-    responsable: "A. Ndiaye",
-    notes: "Traiter sous 48 h — instruction DGS",
-  },
-  {
-    id: 2,
-    numero: "ARR-2026-0047",
-    sens: "Arrivée",
-    date: "2026-08-27",
-    tiers: "Association And Liguey",
-    objet: "Demande d’autorisation d’occupation temporaire",
-    service: "Services techniques",
-    type: "Dépôt physique",
-    priorite: "Normale",
-    statut: "En cours de traitement",
-    echeance: "2026-09-04",
-    responsable: "M. Fall",
-  },
-  {
-    id: 3,
-    numero: "DEP-2026-0031",
-    sens: "Départ",
-    date: "2026-08-26",
-    tiers: "Ministère des Collectivités territoriales",
-    objet: "Réponse à la demande de situation budgétaire",
-    service: "Finances",
-    type: "Recommandé avec AR",
-    priorite: "Urgente",
-    statut: "En attente de signature",
-    echeance: "2026-08-28",
-    responsable: "F. Sarr",
-    signataire: "Maire",
-  },
-  {
-    id: 4,
-    numero: "ARR-2026-0046",
-    sens: "Arrivée",
-    date: "2026-08-25",
-    tiers: "Mamadou Diop",
-    objet: "Demande de copie d’acte de naissance",
-    service: "État civil",
-    type: "Email",
-    priorite: "Normale",
-    statut: "Traité",
-    echeance: "2026-08-30",
-    responsable: "A. Ba",
-  },
-  {
-    id: 5,
-    numero: "ARR-2026-0042",
-    sens: "Arrivée",
-    date: "2026-08-21",
-    tiers: "Entreprise SOTRACOM",
-    objet: "Réclamation relative au marché de voirie",
-    service: "Services techniques",
-    type: "Lettre",
-    priorite: "Normale",
-    statut: "En attente de réponse",
-    echeance: "2026-08-25",
-    responsable: "M. Fall",
-  },
-  {
-    id: 6,
-    numero: "DEP-2026-0030",
-    sens: "Départ",
-    date: "2026-08-24",
-    tiers: "Trésorerie municipale",
-    objet: "Transmission du compte administratif",
-    service: "Finances",
-    type: "Courrier simple",
-    priorite: "Normale",
-    statut: "Expédié",
-    echeance: "2026-08-24",
-    responsable: "F. Sarr",
-    signataire: "DGS",
-  },
-];
-const seedContacts: Contact[] = [
-  {
-    id: 1,
-    nom: "Préfecture de Rufisque",
-    categorie: "Administration",
-    email: "courrier@prefecture.sn",
-    telephone: "33 000 00 01",
-  },
-  {
-    id: 2,
-    nom: "Association And Liguey",
-    categorie: "Association",
-    email: "contact@andliguey.sn",
-    telephone: "77 200 10 10",
-  },
-  {
-    id: 3,
-    nom: "Trésorerie municipale",
-    categorie: "Administration",
-    email: "tresorerie@finances.sn",
-    telephone: "33 000 00 02",
-  },
-];
-const seedUsers: AppUser[] = [
-  {
-    id: 1,
-    nom: "Pape Ibrahima Niang",
-    email: "admin@mairie.sn",
-    role: "Administrateur système",
-    service: "Direction des systèmes d’information",
-    actif: true,
-  },
-  {
-    id: 2,
-    nom: "Aïssatou Ndiaye",
-    email: "courrier@mairie.sn",
-    role: "Secrétariat général / Bureau du courrier",
-    service: "Bureau du courrier",
-    actif: true,
-  },
-  {
-    id: 3,
-    nom: "Oumar Diallo",
-    email: "dgs@mairie.sn",
-    role: "DGS / Secrétaire municipal",
-    service: "Direction générale",
-    actif: true,
-  },
-  {
-    id: 4,
-    nom: "Moussa Fall",
-    email: "m.fall@mairie.sn",
-    role: "Chef de service municipal",
-    service: "Services techniques",
-    actif: true,
-  },
-  {
-    id: 5,
-    nom: "Fatou Sarr",
-    email: "f.sarr@mairie.sn",
-    role: "Agent communal",
-    service: "Finances",
-    actif: true,
-  },
-  {
-    id: 6,
-    nom: "Abdou Ba",
-    email: "a.ba@mairie.sn",
-    role: "Agent communal",
-    service: "État civil",
-    actif: false,
-  },
+const statuts = [
+  "Reçu",
+  "En préparation",
+  "Ventilé",
+  "En cours de traitement",
+  "En attente de signature",
+  "En attente de réponse",
+  "Traité",
+  "Expédié",
 ];
 const nav = [
   ["dashboard", "Tableau de bord", LayoutDashboard],
@@ -308,36 +165,47 @@ export default function Home() {
     [logged, setLogged] = useState(false),
     [role, setRole] = useState<AppUser["role"]>("Administrateur système"),
     [currentUser, setCurrentUser] = useState("Pape Ibrahima Niang");
-  const [items, setItems] = useState<Courrier[]>(seed),
-    [contacts, setContacts] = useState<Contact[]>(seedContacts),
-    [users, setUsers] = useState<AppUser[]>(seedUsers),
+  const [items, setItems] = useState<Courrier[]>([]),
+    [contacts, setContacts] = useState<Contact[]>([]),
+    [users, setUsers] = useState<AppUser[]>([]),
     [notifications, setNotifications] = useState<AppNotification[]>([]),
-    [avatars, setAvatars] = useState<Record<string,string>>({});
+    [avatars, setAvatars] = useState<Record<string, string>>({}),
+    [booting, setBooting] = useState(true);
+  const loadWorkspace = async (user: AppUser) => {
+    const [courriers, reps, notifs, accounts] = await Promise.all([
+      fetchCourriers(),
+      fetchContacts(),
+      fetchNotifications(),
+      fetchAccounts(),
+    ]);
+    setItems(courriers);
+    setContacts(reps);
+    setNotifications(notifs);
+    setUsers(
+      user.role === "Administrateur système"
+        ? await fetchAdminUsers()
+        : accounts,
+    );
+    if (user.avatar) {
+      setAvatars((v) => ({ ...v, [user.nom]: user.avatar! }));
+    }
+  };
   useEffect(() => {
-    const c = localStorage.getItem("mairie-courriers"),
-      p = localStorage.getItem("mairie-contacts"),
-      u = localStorage.getItem("mairie-users"),
-      n = localStorage.getItem("mairie-notifications"),
-      a = localStorage.getItem("mairie-avatars");
-    if (c) setItems(JSON.parse(c));
-    if (p) setContacts(JSON.parse(p));
-    if (u) setUsers(JSON.parse(u));
-    if (n) setNotifications(JSON.parse(n));
-    if (a) setAvatars(JSON.parse(a));
+    const token = getStoredAccessToken();
+    if (!token) {
+      setBooting(false);
+      return;
+    }
+    fetchMe()
+      .then(async (user) => {
+        setRole(user.role);
+        setCurrentUser(user.nom);
+        setLogged(true);
+        await loadWorkspace(user);
+      })
+      .catch(() => clearSession())
+      .finally(() => setBooting(false));
   }, []);
-  useEffect(() => {
-    localStorage.setItem("mairie-courriers", JSON.stringify(items));
-  }, [items]);
-  useEffect(() => {
-    localStorage.setItem("mairie-contacts", JSON.stringify(contacts));
-  }, [contacts]);
-  useEffect(() => {
-    localStorage.setItem("mairie-users", JSON.stringify(users));
-  }, [users]);
-  useEffect(() => {
-    localStorage.setItem("mairie-notifications", JSON.stringify(notifications));
-  }, [notifications]);
-  useEffect(() => { localStorage.setItem("mairie-avatars", JSON.stringify(avatars)); }, [avatars]);
   const scopedItems =
     role === "Chef de service municipal"
       ? items.filter((x) => x.service === "Services techniques")
@@ -355,7 +223,24 @@ export default function Home() {
     : notifications.filter((n) => n.destinataire === currentUser);
   const currentAccount = users.find((u) => u.nom === currentUser);
   const avatar = avatars[currentUser];
-  const setAvatarFile = (file?:File) => { if(!file)return; if(!file.type.startsWith("image/")){notify("Sélectionnez une image valide");return} if(file.size>2*1024*1024){notify("La photo ne doit pas dépasser 2 Mo");return} const reader=new FileReader();reader.onload=()=>{setAvatars((v)=>({...v,[currentUser]:String(reader.result)}));notify("Photo de profil enregistrée")};reader.readAsDataURL(file); };
+  const setAvatarFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/"))
+      return notify("Sélectionnez une image valide");
+    if (file.size > 2 * 1024 * 1024)
+      return notify("La photo ne doit pas dépasser 2 Mo");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      updateProfileAvatar(dataUrl)
+        .then(() => {
+          setAvatars((v) => ({ ...v, [currentUser]: dataUrl }));
+          notify("Photo de profil enregistrée");
+        })
+        .catch(() => notify("Impossible d'enregistrer la photo"));
+    };
+    reader.readAsDataURL(file);
+  };
   const filtered = useMemo(
     () =>
       scopedItems.filter(
@@ -387,41 +272,36 @@ export default function Home() {
     setToast(m);
     setTimeout(() => setToast(""), 2600);
   };
-  const add = (fd: FormData, sens: "Arrivée" | "Départ") => {
-    const n = items.filter((x) => x.sens === sens).length + 49;
-    const c: Courrier = {
-      id: Date.now(),
-      numero: `${sens === "Arrivée" ? "ARR" : "DEP"}-2026-${String(n).padStart(4, "0")}`,
-      sens,
-      date: String(fd.get("date")),
-      tiers: String(fd.get("tiers")),
-      objet: String(fd.get("objet")),
-      service: String(fd.get("service")),
-      type: String(fd.get("type")),
-      priorite: String(fd.get("priorite")) as Courrier["priorite"],
-      statut: sens === "Arrivée" ? "Reçu" : "En préparation",
-      echeance: String(fd.get("echeance")),
-      responsable:
-        sens === "Arrivée"
-          ? String(fd.get("responsable"))
-          : "Bureau du courrier",
-      signataire: String(fd.get("signataire") || ""),
-    };
-    setItems((v) => [c, ...v]);
-    if (sens === "Arrivée")
-      setNotifications((v) => [
-        {
-          id: Date.now(),
-          destinataire: c.responsable,
-          courrier: c.numero,
-          message: `Nouveau courrier affecté : ${c.objet} — échéance ${fmt(c.echeance)}`,
-          date: new Date().toISOString(),
-          lue: false,
-        },
-        ...v,
-      ]);
-    setDialog(null);
-    notify(`${c.numero} enregistré avec succès`);
+  const add = async (fd: FormData, sens: "Arrivée" | "Départ") => {
+    try {
+      const c = await createCourrier({
+        sens,
+        date: String(fd.get("date")),
+        tiers: String(fd.get("tiers")),
+        objet: String(fd.get("objet")),
+        service: String(fd.get("service")),
+        type: String(fd.get("type")),
+        priorite: String(fd.get("priorite")) as Courrier["priorite"],
+        statut: sens === "Arrivée" ? "Reçu" : "En préparation",
+        echeance: String(fd.get("echeance")),
+        responsable:
+          sens === "Arrivée"
+            ? String(fd.get("responsable"))
+            : "Bureau du courrier",
+        signataire: String(fd.get("signataire") || ""),
+      });
+      setItems((v) => [c, ...v]);
+      setNotifications(await fetchNotifications());
+      setDialog(null);
+      notify(`${c.numero} enregistré avec succès`);
+    } catch {
+      notify("Erreur lors de l'enregistrement du courrier");
+    }
+  };
+  const updateCourrierStatut = async (id: number, statut: string) => {
+    const updated = await patchCourrier(id, { statut });
+    setItems((v) => v.map((x) => (x.id === id ? updated : x)));
+    return updated;
   };
   const exportCSV = () => {
     const data = [
@@ -447,14 +327,20 @@ export default function Home() {
     a.click();
     notify("Export CSV généré");
   };
+  if (booting)
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f3f5f4] text-sm text-[#587067]">
+        Chargement de Courrier 360…
+      </main>
+    );
   if (!logged)
     return (
       <Login
-        users={users}
-        onLogin={(user) => {
+        onLogin={async (user) => {
           setRole(user.role);
           setCurrentUser(user.nom);
           setLogged(true);
+          await loadWorkspace(user);
           notify(`Bienvenue ${user.nom}`);
         }}
       />
@@ -545,7 +431,10 @@ export default function Home() {
             </button>
             <button onClick={() => setDialog("profile")} className="hidden max-w-[265px] items-center gap-2 rounded-xl border bg-white px-2.5 py-1.5 text-left transition hover:border-[#4d7d6b] sm:flex"><span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#dceae4] text-xs font-bold text-[#19513e]">{avatar?<img src={avatar} alt="Photo de profil" className="h-full w-full object-cover"/>:currentUser.split(" ").map(n=>n[0]).slice(0,2).join("")}</span><span className="min-w-0"><b className="block truncate text-xs">{currentUser}</b><span className="block truncate text-[10px] text-[#6c7e76]">{role} • Mon profil</span></span></button>
             <button
-              onClick={() => setLogged(false)}
+              onClick={() => {
+                clearSession();
+                setLogged(false);
+              }}
               className="hidden rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700 xl:block"
             >
               Déconnexion
@@ -566,7 +455,7 @@ export default function Home() {
             <Dashboard
               stats={stats}
               items={scopedItems}
-              open={(x) => {
+              open={(x: Courrier) => {
                 setSelected(x);
                 setDialog("detail");
               }}
@@ -582,7 +471,7 @@ export default function Home() {
               setStatus={setStatus}
               service={service}
               setService={setService}
-              open={(x) => {
+              open={(x: Courrier) => {
                 setSelected(x);
                 setDialog("detail");
               }}
@@ -591,20 +480,24 @@ export default function Home() {
             />
           )}
           {tab === "circuit" && (
-            <Circuit items={scopedItems} setItems={setItems} notify={notify} />
+            <Circuit
+              items={scopedItems}
+              onAdvance={updateCourrierStatut}
+              notify={notify}
+            />
           )}
           {tab === "registres" && (
             <Registres items={items} exportCSV={exportCSV} notify={notify} />
           )}
           {tab === "contacts" && (
-            <Contacts
-              contacts={contacts}
-              setContacts={setContacts}
-              notify={notify}
-            />
+            <Contacts contacts={contacts} onAdded={(c) => setContacts((v) => [...v, c])} notify={notify} />
           )}
           {tab === "administration" && role === "Administrateur système" && (
-            <Administration users={users} setUsers={setUsers} notify={notify} />
+            <Administration
+              users={users}
+              onUsersChange={setUsers}
+              notify={notify}
+            />
           )}
         </div>
       </section>
@@ -640,14 +533,14 @@ export default function Home() {
           {selected && (
             <Detail
               c={selected}
-              update={(s) => {
-                setItems((v) =>
-                  v.map((x) =>
-                    x.id === selected.id ? { ...x, statut: s } : x,
-                  ),
-                );
-                setSelected({ ...selected, statut: s });
-                notify("Statut mis à jour");
+              update={async (s) => {
+                try {
+                  const updated = await updateCourrierStatut(selected.id, s);
+                  setSelected(updated);
+                  notify("Statut mis à jour");
+                } catch {
+                  notify("Impossible de mettre à jour le statut");
+                }
               }}
             />
           )}
@@ -667,27 +560,44 @@ export default function Home() {
           <div className="grid gap-3 rounded-xl bg-[#edf3f0] p-4 text-sm sm:grid-cols-2"><div><small className="text-[#718279]">Nom complet</small><b className="block">{currentUser}</b></div><div><small className="text-[#718279]">Fonction</small><b className="block">{role}</b></div><div><small className="text-[#718279]">Adresse professionnelle</small><b className="block">{currentAccount?.email}</b></div><div><small className="text-[#718279]">Service municipal</small><b className="block">{currentAccount?.service}</b></div></div>
           <h3 className="border-t pt-4 text-sm font-semibold">Changer mon mot de passe</h3>
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              setDialog(null);
-              notify("Mot de passe modifié");
+              const f = new FormData(e.currentTarget);
+              const cur = String(f.get("current"));
+              const n1 = String(f.get("new"));
+              const n2 = String(f.get("confirm"));
+              if (n1 !== n2) {
+                notify("Les mots de passe ne correspondent pas");
+                return;
+              }
+              try {
+                await changePassword(cur, n1);
+                setDialog(null);
+                notify("Mot de passe modifié");
+                e.currentTarget.reset();
+              } catch {
+                notify("Mot de passe actuel incorrect");
+              }
             }}
             className="space-y-3"
           >
             <input
               className="control w-full"
+              name="current"
               type="password"
               placeholder="Mot de passe actuel"
               required
             />
             <input
               className="control w-full"
+              name="new"
               type="password"
               placeholder="Nouveau mot de passe"
               required
             />
             <input
               className="control w-full"
+              name="confirm"
               type="password"
               placeholder="Confirmer le mot de passe"
               required
@@ -719,8 +629,10 @@ export default function Home() {
                 <button
                   key={n.id}
                   onClick={() =>
-                    setNotifications((v) =>
-                      v.map((x) => (x.id === n.id ? { ...x, lue: true } : x)),
+                    markNotificationRead(n.id).then(() =>
+                      setNotifications((v) =>
+                        v.map((x) => (x.id === n.id ? { ...x, lue: true } : x)),
+                      ),
                     )
                   }
                   className={`w-full rounded-xl border p-4 text-left ${n.lue ? "bg-white" : "border-[#9dc8b7] bg-[#edf8f3]"}`}
@@ -744,7 +656,9 @@ export default function Home() {
           {visibleNotifications.some((n) => !n.lue) && (
             <button
               onClick={() =>
-                setNotifications((v) => v.map((x) => ({ ...x, lue: true })))
+                markAllNotificationsRead().then(() =>
+                  setNotifications((v) => v.map((x) => ({ ...x, lue: true }))),
+                )
               }
               className="btn-light justify-center"
             >
@@ -962,7 +876,7 @@ function Courriers({
           onChange={(e) => setStatus(e.target.value)}
         >
           <option>Tous</option>
-          {[...new Set(seed.map((x) => x.statut))].map((x) => (
+          {statuts.map((x) => (
             <option key={x}>{x}</option>
           ))}
         </select>
@@ -1029,23 +943,25 @@ function Courriers({
   );
 }
 
-function Circuit({ items, setItems, notify }: any) {
-  const cols = [
-    "Reçu",
-    "Ventilé",
-    "En cours de traitement",
-    "En attente de signature",
-    "En attente de réponse",
-    "Traité",
-    "Expédié",
-  ];
-  const advance = (c: Courrier) => {
+function Circuit({
+  items,
+  onAdvance,
+  notify,
+}: {
+  items: Courrier[];
+  onAdvance: (id: number, statut: string) => Promise<Courrier>;
+  notify: (x: string) => void;
+}) {
+  const cols = statuts.filter((x) => x !== "En préparation");
+  const advance = async (c: Courrier) => {
     const i = cols.indexOf(c.statut),
       n = cols[Math.min(i + 1, cols.length - 1)];
-    setItems((v: Courrier[]) =>
-      v.map((x) => (x.id === c.id ? { ...x, statut: n } : x)),
-    );
-    notify(`${c.numero} passe au statut « ${n} »`);
+    try {
+      await onAdvance(c.id, n);
+      notify(`${c.numero} passe au statut « ${n} »`);
+    } catch {
+      notify("Impossible de faire avancer le dossier");
+    }
   };
   return (
     <div>
@@ -1158,23 +1074,32 @@ function Registres({ items, exportCSV, notify }: any) {
   );
 }
 
-function Contacts({ contacts, setContacts, notify }: any) {
+function Contacts({
+  contacts,
+  onAdded,
+  notify,
+}: {
+  contacts: Contact[];
+  onAdded: (c: Contact) => void;
+  notify: (x: string) => void;
+}) {
   const [q, setQ] = useState("");
-  const add = (e: React.FormEvent<HTMLFormElement>) => {
+  const add = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    setContacts((v: Contact[]) => [
-      ...v,
-      {
-        id: Date.now(),
+    try {
+      const c = await createContact({
         nom: String(f.get("nom")),
         categorie: String(f.get("categorie")),
         email: String(f.get("email")),
         telephone: String(f.get("telephone")),
-      },
-    ]);
-    e.currentTarget.reset();
-    notify("Contact ajouté au répertoire");
+      });
+      onAdded(c);
+      e.currentTarget.reset();
+      notify("Contact ajouté au répertoire");
+    } catch {
+      notify("Impossible d'ajouter le contact");
+    }
   };
   return (
     <div>
@@ -1251,30 +1176,30 @@ function Contacts({ contacts, setContacts, notify }: any) {
 
 function Administration({
   users,
-  setUsers,
+  onUsersChange,
   notify,
 }: {
   users: AppUser[];
-  setUsers: React.Dispatch<React.SetStateAction<AppUser[]>>;
+  onUsersChange: React.Dispatch<React.SetStateAction<AppUser[]>>;
   notify: (x: string) => void;
 }) {
   const [view, setView] = useState("utilisateurs");
-  const add = (e: React.FormEvent<HTMLFormElement>) => {
+  const add = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    setUsers((v) => [
-      ...v,
-      {
-        id: Date.now(),
+    try {
+      const u = await createAdminUser({
         nom: String(f.get("nom")),
         email: String(f.get("email")),
         role: String(f.get("role")) as AppUser["role"],
         service: String(f.get("service")),
-        actif: true,
-      },
-    ]);
-    e.currentTarget.reset();
-    notify("Compte utilisateur créé");
+      });
+      onUsersChange((v) => [...v, u]);
+      e.currentTarget.reset();
+      notify("Compte utilisateur créé. Définissez le mot de passe depuis l'administration Django.");
+    } catch {
+      notify("Impossible de créer le compte");
+    }
   };
   return (
     <div>
@@ -1321,14 +1246,16 @@ function Administration({
                       <td>
                         <button
                           onClick={() => {
-                            setUsers((v) =>
-                              v.map((x) =>
-                                x.id === u.id ? { ...x, actif: !x.actif } : x,
-                              ),
-                            );
-                            notify(
-                              u.actif ? "Compte désactivé" : "Compte activé",
-                            );
+                            patchAdminUser(u.id, { actif: !u.actif })
+                              .then((updated) => {
+                                onUsersChange((v) =>
+                                  v.map((x) => (x.id === u.id ? updated : x)),
+                                );
+                                notify(
+                                  u.actif ? "Compte désactivé" : "Compte activé",
+                                );
+                              })
+                              .catch(() => notify("Action impossible"));
                           }}
                           className="btn-light py-2"
                         >
@@ -1479,15 +1406,10 @@ function Administration({
   );
 }
 
-function Login({
-  onLogin,
-  users,
-}: {
-  onLogin: (user: AppUser) => void;
-  users: AppUser[];
-}) {
+function Login({ onLogin }: { onLogin: (user: AppUser) => void | Promise<void> }) {
   const [sent, setSent] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(false);
   return (
     <main className="grid min-h-screen place-items-center bg-[#123f31] p-5">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
@@ -1502,32 +1424,25 @@ function Login({
         </div>
         {!sent ? (
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget),
                 email = String(f.get("email")).toLowerCase(),
                 password = String(f.get("password"));
-              const user = users.find((u) => u.email.toLowerCase() === email);
-              if (!user) {
-                setError(
-                  "Adresse inconnue. Utilisez l’un des comptes de démonstration.",
-                );
-                return;
-              }
-              if (!user.actif) {
-                setError(
-                  "Ce compte municipal est désactivé. Contactez l’administrateur.",
-                );
-                return;
-              }
-              if (password !== "demo2026") {
-                setError(
-                  "Mot de passe incorrect. Mot de passe de démonstration : demo2026",
-                );
-                return;
-              }
+              setLoading(true);
               setError("");
-              onLogin(user);
+              try {
+                const { user } = await apiLogin(email, password);
+                await onLogin(user);
+              } catch (err) {
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : "Connexion impossible. Vérifiez l'API Django.",
+                );
+              } finally {
+                setLoading(false);
+              }
             }}
             className="space-y-4"
           >
@@ -1560,35 +1475,16 @@ function Login({
                 {error}
               </p>
             )}
-            <button className="btn-main w-full justify-center">
-              Se connecter
+            <button
+              disabled={loading}
+              className="btn-main w-full justify-center disabled:opacity-60"
+            >
+              {loading ? "Connexion…" : "Se connecter"}
             </button>
-            <div className="rounded-xl border border-[#dce5e1] bg-[#f7f9f8] p-3 text-xs text-[#5b7067]">
-              <b className="block text-[#294d3f]">Comptes de démonstration</b>
-              <div className="mt-2 space-y-1">
-                {users
-                  .filter((u) => u.actif)
-                  .map((u) => (
-                    <button
-                      type="button"
-                      key={u.id}
-                      onClick={(e) => {
-                        const form = e.currentTarget.closest("form");
-                        const input = form?.querySelector<HTMLInputElement>(
-                          'input[name="email"]',
-                        );
-                        if (input) input.value = u.email;
-                      }}
-                      className="block w-full truncate text-left hover:font-bold"
-                    >
-                      {u.email} — {u.role}
-                    </button>
-                  ))}
-              </div>
-              <p className="mt-2 border-t pt-2">
-                Mot de passe commun : <b>demo2026</b>
-              </p>
-            </div>
+            <p className="rounded-xl border border-[#dce5e1] bg-[#f7f9f8] px-3 py-2.5 text-center text-xs text-[#5b7067]">
+              Identifiants professionnels délivrés par la direction des systèmes
+              d&apos;information.
+            </p>
             <button
               type="button"
               onClick={() => setSent(true)}
