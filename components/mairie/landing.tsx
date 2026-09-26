@@ -7,7 +7,6 @@ import {
   BookOpen,
   Building2,
   CheckCircle2,
-  Clock3,
   Coins,
   FileInput,
   GitBranch,
@@ -19,7 +18,6 @@ import {
   Mail,
   MapPin,
   Menu,
-  Send,
   ShieldCheck,
   Timer,
   Users,
@@ -83,66 +81,6 @@ function SectionIntro({ eyebrow, title, text, center, light }: { eyebrow: string
       <h2 className={`font-display mt-3 text-3xl font-bold tracking-tight sm:text-4xl ${light ? "text-white" : "text-brand-950"}`}>{title}</h2>
       <p className={`mt-4 leading-7 ${light ? "text-white/65" : "text-muted-ink"}`}>{text}</p>
     </Reveal>
-  );
-}
-
-function HeroPreview() {
-  const rows = [
-    ["ARR-2026-0142", "Demande d’autorisation de construire", "Urbanisme", "Reçu", "tag-gray"],
-    ["ARR-2026-0141", "Convocation réunion de coordination", "Cabinet du Maire", "Ventilé", "tag-blue"],
-    ["DEP-2026-0087", "Réponse subvention associative", "Affaires sociales", "À signer", "tag-amber"],
-  ];
-  return (
-    <div className="relative mx-auto w-full max-w-[540px]" aria-hidden>
-      <div className="absolute -inset-6 -z-10 rounded-[36px] bg-gradient-to-br from-gold-400/30 via-brand-200/40 to-transparent blur-2xl" />
-      <div className="animate-float rounded-[26px] border border-white/80 bg-white/95 p-5 shadow-[0_30px_80px_-20px_rgba(10,58,38,.4)] backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="eyebrow !text-[9px]">Aperçu de l’espace agents</p>
-            <b className="text-sm text-ink">Bureau du courrier</b>
-          </div>
-          <span className="tag tag-green">En ligne</span>
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
-          {(
-            [
-              ["Aujourd’hui", "12", Mail, "bg-brand-100 text-brand-700"],
-              ["À traiter", "27", Clock3, "bg-gold-100 text-[#8a5d00]"],
-              ["Expédiés", "54", Send, "bg-navy-100 text-navy-700"],
-            ] as const
-          ).map(([l, n, Icon, c]) => (
-            <div key={l} className="rounded-2xl border border-line p-3">
-              <span className={`grid size-8 place-items-center rounded-lg ${c}`}>
-                <Icon size={15} />
-              </span>
-              <b className="font-display mt-2 block text-xl text-ink">{n}</b>
-              <small className="text-[11px] text-muted-ink">{l}</small>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-line">
-          {rows.map(([n, o, s, st, t]) => (
-            <div key={n} className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-3 last:border-0">
-              <span className="min-w-0">
-                <b className="block text-[11px] text-muted-ink">{n}</b>
-                <span className="block truncate text-xs font-semibold text-ink">{o}</span>
-                <small className="text-[10px] text-muted-ink">{s}</small>
-              </span>
-              <span className={`tag shrink-0 ${t}`}>{st}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="animate-float-delayed absolute -bottom-6 -left-4 hidden items-center gap-3 rounded-2xl border border-white bg-white p-3 pr-5 shadow-xl sm:flex">
-        <span className="grid size-9 place-items-center rounded-xl bg-brand-800 text-gold-400">
-          <Bell size={16} />
-        </span>
-        <span>
-          <b className="block text-xs text-ink">Nouveau courrier affecté</b>
-          <small className="text-[10px] text-muted-ink">Échéance dans 7 jours</small>
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -217,50 +155,57 @@ export default function Landing({ onLogin }: { onLogin: () => void }) {
       </header>
 
       <main>
-        <section id="accueil" className="relative overflow-hidden px-5 pb-24 pt-16 sm:px-8 lg:pb-28 lg:pt-24">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,#dcefe4_0%,transparent_55%),radial-gradient(ellipse_at_bottom_left,#fbf1cf_0%,transparent_45%)]" />
-          <div className="relative mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.05fr_1fr]">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-brand-700">
-                <span className="size-1.5 rounded-full bg-gold-500" />
+        <section id="accueil" className="relative isolate overflow-hidden bg-brand-950 px-5 pb-28 pt-20 sm:px-8 lg:pb-36 lg:pt-28">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/hotel-de-ville-ziguinchor.jpg"
+            alt="Façade de l’Hôtel de ville de Ziguinchor"
+            className="absolute inset-0 -z-20 h-full w-full object-cover object-[65%_40%]"
+          />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-brand-950/95 via-brand-950/80 to-brand-950/35 max-lg:via-brand-950/85 max-lg:to-brand-950/70" />
+          <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-brand-950/70 to-transparent" />
+          <div className="relative mx-auto max-w-7xl">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur">
+                <span className="size-1.5 rounded-full bg-gold-400" />
                 Plateforme numérique officielle de la commune
               </span>
-              <h1 className="font-display mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-brand-950 sm:text-5xl lg:text-[3.5rem]">
+              <h1 className="font-display mt-6 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.5rem]">
                 Mairie de Ziguinchor :{" "}
-                <span className="relative text-brand-600">
+                <span className="relative text-gold-400">
                   le courrier administratif
-                  <svg viewBox="0 0 200 12" className="absolute -bottom-2 left-0 h-3 w-full text-gold-400" preserveAspectRatio="none" aria-hidden>
+                  <svg viewBox="0 0 200 12" className="absolute -bottom-2 left-0 h-3 w-full text-gold-400/70" preserveAspectRatio="none" aria-hidden>
                     <path d="M2 9C50 3 150 3 198 9" stroke="currentColor" strokeWidth="5" fill="none" strokeLinecap="round" />
                   </svg>
                 </span>{" "}
                 suivi de bout en bout.
               </h1>
-              <p className="mt-7 max-w-xl text-base leading-7 text-[#4c6358] sm:text-lg sm:leading-8">
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
                 La plateforme de gestion du courrier de la Mairie de Ziguinchor
                 centralise l’enregistrement, l’affectation et le suivi de chaque
                 pli adressé à la commune ou émis par ses services. Les agents
                 savent quoi traiter, les responsables voient où en sont les dossiers.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <button onClick={onLogin} className="btn-main px-6 py-3.5 text-sm shadow-lg shadow-brand-900/20 hover:-translate-y-0.5">
+                <button onClick={onLogin} className="btn-gold px-6 py-3.5 text-sm shadow-lg shadow-black/20 hover:-translate-y-0.5">
                   Accéder à l’espace agents <ArrowRight size={16} />
                 </button>
-                <a href="#plateforme" className="btn-light px-6 py-3.5 text-sm hover:-translate-y-0.5">
+                <a href="#plateforme" className="btn-light border-white/30 bg-white/10 px-6 py-3.5 text-sm text-white backdrop-blur hover:-translate-y-0.5 hover:!bg-white/20">
                   Découvrir la plateforme
                 </a>
               </div>
-              <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-[#4c6358]">
+              <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-white/80">
                 {["Numérotation automatique", "Registres officiels", "Accès sécurisé par rôle"].map((t) => (
                   <span key={t} className="flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-brand-600" /> {t}
+                    <CheckCircle2 size={16} className="text-gold-400" /> {t}
                   </span>
                 ))}
               </div>
             </div>
-            <div>
-              <HeroPreview />
-            </div>
           </div>
+          <p className="absolute bottom-14 right-5 hidden items-center gap-2 rounded-full bg-black/35 px-3 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur sm:right-8 lg:flex">
+            <MapPin size={13} className="text-gold-400" /> Hôtel de ville de Ziguinchor
+          </p>
         </section>
 
         <section aria-label="Indicateurs clés" className="relative z-10 -mt-10 px-5 sm:px-8">
