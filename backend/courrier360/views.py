@@ -7,7 +7,7 @@ def api_home(request):
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Courrier 360 — API</title>
+  <title>Mairie de Ziguinchor — API</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
   <style>
@@ -64,7 +64,7 @@ def api_home(request):
 <body>
   <div class="wrap">
     <span class="badge">Backend Django</span>
-    <h1>Courrier 360</h1>
+    <h1>Mairie de Ziguinchor</h1>
     <p class="sub">API REST de la Mairie de Ziguinchor — authentification JWT et gestion des courriers administratifs.</p>
     <div class="cards">
       <a class="card" href="/admin/">
@@ -80,7 +80,7 @@ def api_home(request):
         <span><code>GET /api/courriers/</code> — registre arrivée / départ (authentification requise)</span>
       </a>
     </div>
-    <footer>Commune de Ziguinchor · Courrier 360 · SQLite (développement)</footer>
+    <footer>Commune de Ziguinchor · Gestion du courrier · SQLite (développement)</footer>
   </div>
 </body>
 </html>"""

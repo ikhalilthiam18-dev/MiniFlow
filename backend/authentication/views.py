@@ -1,10 +1,12 @@
 from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
 from .serializers import (
+    AdminSetPasswordSerializer,
     PasswordChangeSerializer,
     UserAdminSerializer,
     UserSerializer,
@@ -56,6 +58,16 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserAdminSerializer
     permission_classes = [permissions.IsAuthenticated, IsSystemAdmin]
     queryset = User.objects.all().order_by("nom")
+
+    @action(detail=True, methods=["post"], url_path="set-password")
+    def set_password(self, request, pk=None):
+        """Définit un nouveau mot de passe (provisoire) pour un agent."""
+        user = self.get_object()
+        serializer = AdminSetPasswordSerializer(data=request.data, context={"user": user})
+        serializer.is_valid(raise_exception=True)
+        user.set_password(serializer.validated_data["password"])
+        user.save(update_fields=["password"])
+        return Response({"detail": "Mot de passe réinitialisé."})
 
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()

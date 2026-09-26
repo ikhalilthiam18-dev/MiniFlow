@@ -89,6 +89,17 @@ async function refreshAccessToken(): Promise<string | null> {
   return data.access;
 }
 
+/** Turns a DRF error body ({detail} or {field: [messages]}) into one readable message. */
+function errorMessage(body: unknown): string {
+  if (!body || typeof body !== "object") return "";
+  const b = body as Record<string, unknown>;
+  if (typeof b.detail === "string") return b.detail;
+  return Object.values(b)
+    .flatMap((v) => (Array.isArray(v) ? v : [v]))
+    .filter((v): v is string => typeof v === "string")
+    .join(" ");
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -111,8 +122,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     let detail = "Erreur serveur";
     try {
-      const err = (await res.json()) as { detail?: string };
-      detail = err.detail || detail;
+      detail = errorMessage(await res.json()) || detail;
     } catch {
       /* ignore */
     }
@@ -172,7 +182,9 @@ export async function fetchAdminUsers(): Promise<ApiUser[]> {
   return apiFetch<ApiUser[]>("/api/auth/users/");
 }
 
-export async function createAdminUser(body: Omit<ApiUser, "id" | "actif">): Promise<ApiUser> {
+export async function createAdminUser(
+  body: Omit<ApiUser, "id" | "actif"> & { password?: string },
+): Promise<ApiUser> {
   return apiFetch<ApiUser>("/api/auth/users/", {
     method: "POST",
     body: JSON.stringify({ ...body, actif: true }),
@@ -186,6 +198,13 @@ export async function patchAdminUser(
   return apiFetch<ApiUser>(`/api/auth/users/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+}
+
+export async function adminSetPassword(id: number, password: string): Promise<void> {
+  await apiFetch(`/api/auth/users/${id}/set-password/`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
   });
 }
 

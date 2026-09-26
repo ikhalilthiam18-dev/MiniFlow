@@ -7,8 +7,8 @@ from django.urls import include, path
 
 from .views import api_home
 
-admin.site.site_header = "Courrier 360 — Administration"
-admin.site.site_title = "Courrier 360"
+admin.site.site_header = "Mairie de Ziguinchor — Administration"
+admin.site.site_title = "Mairie de Ziguinchor"
 admin.site.index_title = "Bureau du courrier"
 
 urlpatterns = [

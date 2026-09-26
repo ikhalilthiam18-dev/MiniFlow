@@ -156,8 +156,8 @@ CORS_ALLOW_CREDENTIALS = True
 # ──────────────────────────────────────────────
 
 JAZZMIN_SETTINGS = {
-    "site_title": "Courrier 360",
-    "site_header": "Courrier 360",
+    "site_title": "Mairie de Ziguinchor",
+    "site_header": "Mairie de Ziguinchor",
     "site_brand": "Mairie de Ziguinchor",
     "site_logo_classes": "img-circle",
     "welcome_sign": "Gestion du courrier — espace administration",
