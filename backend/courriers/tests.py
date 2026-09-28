@@ -97,9 +97,9 @@ class CourrierTests(APITestCase):
     def test_changement_de_statut(self):
         res = self.create()
         self.client.force_authenticate(self.agent)
-        patch = self.client.patch(f"/api/courriers/{res.data['id']}/", {"statut": "Ventilé"})
+        patch = self.client.patch(f"/api/courriers/{res.data['id']}/", {"statut": "En cours de traitement"})
         self.assertEqual(patch.status_code, status.HTTP_200_OK)
-        self.assertEqual(Courrier.objects.get(id=res.data["id"]).statut, "Ventilé")
+        self.assertEqual(Courrier.objects.get(id=res.data["id"]).statut, "En cours de traitement")
 
 
 class ContactPermissionTests(APITestCase):
@@ -231,7 +231,7 @@ class ModificationTests(APITestCase):
         self.client.force_authenticate(self.agent)
         url = f"/api/courriers/{self.cid}/"
         self.assertEqual(self.client.patch(url, {"objet": "Piraté"}).status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self.client.patch(url, {"statut": "Ventilé", "notes": "Vu"}).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.patch(url, {"statut": "Traité", "notes": "Vu"}).status_code, status.HTTP_200_OK)
 
 
 class PieceJointeTests(APITestCase):
@@ -332,3 +332,80 @@ class EmailEtRappelsTests(APITestCase):
         rappels = Notification.objects.filter(destinataire=self.agent, message__startswith="Échéance dépassée")
         self.assertEqual(rappels.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
+
+
+class DroitsParStatutTests(APITestCase):
+    def setUp(self):
+        self.courrier = make_user("courrier@mairie.sn", UserRole.COURRIER, "Bureau du courrier", "Aïssatou Ndiaye")
+        self.dgs = make_user("dgs@mairie.sn", UserRole.DGS, "Direction générale", "Oumar Diallo")
+        self.chef = make_user("chef@mairie.sn", UserRole.CHEF, "Finances", "Moussa Fall")
+        self.agent = make_user("agent@mairie.sn", UserRole.AGENT, "Finances", "Fatou Sarr")
+        self.client.force_authenticate(self.courrier)
+        self.cid = self.client.post("/api/courriers/", courrier_data()).data["id"]
+
+    def passer(self, user, statut):
+        self.client.force_authenticate(user)
+        return self.client.patch(f"/api/courriers/{self.cid}/", {"statut": statut}).status_code
+
+    def test_agent(self):
+        self.assertEqual(self.passer(self.agent, "En cours de traitement"), status.HTTP_200_OK)
+        self.assertEqual(self.passer(self.agent, "Traité"), status.HTTP_200_OK)
+        for interdit in ("Ventilé", "Signé", "Expédié", "Archivé", "En attente de signature"):
+            self.assertEqual(self.passer(self.agent, interdit), status.HTTP_403_FORBIDDEN, interdit)
+
+    def test_chef_de_service(self):
+        self.assertEqual(self.passer(self.chef, "En attente de signature"), status.HTTP_200_OK)
+        for interdit in ("Ventilé", "Signé", "Expédié", "Archivé"):
+            self.assertEqual(self.passer(self.chef, interdit), status.HTTP_403_FORBIDDEN, interdit)
+
+    def test_dgs(self):
+        self.assertEqual(self.passer(self.dgs, "Signé"), status.HTTP_200_OK)
+        for interdit in ("Ventilé", "Expédié", "Archivé", "Reçu"):
+            self.assertEqual(self.passer(self.dgs, interdit), status.HTTP_403_FORBIDDEN, interdit)
+
+    def test_bureau_du_courrier(self):
+        for statut in ("Ventilé", "Expédié", "Archivé"):
+            self.assertEqual(self.passer(self.courrier, statut), status.HTTP_200_OK, statut)
+
+    def test_le_dgs_garde_l_enregistrement(self):
+        self.client.force_authenticate(self.dgs)
+        self.assertEqual(self.client.post("/api/courriers/", courrier_data()).status_code, status.HTTP_201_CREATED)
+
+    def test_statut_force_a_la_creation(self):
+        self.client.force_authenticate(self.courrier)
+        res = self.client.post("/api/courriers/", courrier_data(statut="Archivé"))
+        self.assertEqual(res.data["statut"], "Reçu")
+
+    def test_garder_le_meme_statut_reste_possible(self):
+        # Un agent peut enregistrer une annotation sur un dossier « Reçu ».
+        self.client.force_authenticate(self.agent)
+        res = self.client.patch(f"/api/courriers/{self.cid}/", {"statut": "Reçu", "notes": "Pris en compte"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+
+class VisibiliteStricteTests(APITestCase):
+    def setUp(self):
+        self.courrier = make_user("courrier@mairie.sn", UserRole.COURRIER, "Bureau du courrier", "Aïssatou Ndiaye")
+        self.agent = make_user("agent@mairie.sn", UserRole.AGENT, "Finances", "Fatou Sarr")
+        self.collegue = make_user("collegue@mairie.sn", UserRole.AGENT, "Finances", "Awa Diouf")
+        self.chef = make_user("chef@mairie.sn", UserRole.CHEF, "Services techniques", "Moussa Fall")
+        self.client.force_authenticate(self.courrier)
+        self.a_moi = self.client.post("/api/courriers/", courrier_data(responsable="Fatou Sarr", objet="Mon dossier")).data["id"]
+        self.au_collegue = self.client.post("/api/courriers/", courrier_data(responsable="Awa Diouf", objet="Dossier du collègue")).data["id"]
+        self.au_chef_ailleurs = self.client.post(
+            "/api/courriers/", courrier_data(service="Urbanisme", responsable="Moussa Fall", objet="Affecté au chef")
+        ).data["id"]
+
+    def ids(self, user):
+        self.client.force_authenticate(user)
+        return {c["id"] for c in self.client.get("/api/courriers/").data}
+
+    def test_un_agent_ne_voit_pas_les_dossiers_de_ses_collegues_du_meme_service(self):
+        self.assertEqual(self.ids(self.agent), {self.a_moi})
+        self.client.force_authenticate(self.agent)
+        res = self.client.get(f"/api/courriers/{self.au_collegue}/")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_un_chef_voit_les_dossiers_qui_lui_sont_affectes_hors_de_son_service(self):
+        self.assertIn(self.au_chef_ailleurs, self.ids(self.chef))
+        self.assertNotIn(self.a_moi, self.ids(self.chef))

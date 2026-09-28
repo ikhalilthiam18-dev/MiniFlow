@@ -77,16 +77,29 @@ def trouver_agent(responsable: str, actifs_seulement: bool = True):
     return None
 
 
+def _affectes_a(user: User) -> Q:
+    """Dossiers dont l'utilisateur est le responsable.
+
+    Lien par compte ; le nom écrit ne sert que pour les anciens dossiers non reliés.
+    """
+    anciens = Q(agent__isnull=True) & Q(responsable__in=[user.nom, nom_court(user.nom)])
+    return Q(agent=user) | anciens
+
+
 def courriers_for_user(user: User):
+    """Courriers visibles : chacun ne voit que ce qui le concerne.
+
+    - administrateur, bureau du courrier, DGS : tous (enregistrement et supervision) ;
+    - chef de service : son service, plus les dossiers qui lui sont affectés ;
+    - agent communal : uniquement les dossiers qui lui sont affectés.
+    """
     qs = Courrier.objects.all()
     if user.role in ROLES_VUE_GLOBALE:
         return qs
     if user.role == "Chef de service municipal":
-        return qs.filter(service=user.service)
+        return qs.filter(Q(service=user.service) | _affectes_a(user))
     if user.role == "Agent communal":
-        # Lien par compte ; le nom écrit ne sert que pour les anciens dossiers non reliés.
-        anciens = Q(agent__isnull=True) & Q(responsable__in=[user.nom, nom_court(user.nom)])
-        return qs.filter(Q(agent=user) | Q(service=user.service) | anciens)
+        return qs.filter(_affectes_a(user))
     return qs.none()
 
 

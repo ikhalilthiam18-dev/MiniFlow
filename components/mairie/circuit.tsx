@@ -6,10 +6,12 @@ import {
   etapeSuivante,
   fmt,
   joursRestants,
+  peutDonnerStatut,
   statuts,
   toneStatut,
   type Courrier,
   type Notify,
+  type Role,
 } from "@/lib/mairie";
 import { Avatar, PageHead, Segmented, Spinner } from "./ui";
 
@@ -26,11 +28,13 @@ export function Circuit({
   onAdvance,
   notify,
   open,
+  role,
 }: {
   items: Courrier[];
   onAdvance: (id: number, statut: string) => Promise<Courrier>;
   notify: Notify;
   open: (c: Courrier) => void;
+  role: Role;
 }) {
   const [q, setQ] = useState("");
   const [vue, setVue] = useState<"Actifs" | "Tous">("Actifs");
@@ -49,8 +53,8 @@ export function Circuit({
     try {
       await onAdvance(c.id, n);
       notify(`${c.numero} passe à l’étape « ${n} »`);
-    } catch {
-      notify("Impossible de faire avancer le dossier", "error");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Impossible de faire avancer le dossier", "error");
     } finally {
       setBusy(null);
     }
@@ -93,7 +97,9 @@ export function Circuit({
                     </p>
                   )}
                   {list.map((c) => {
-                    const n = etapeSuivante(c);
+                    const suivante = etapeSuivante(c);
+                    // Bouton affiché seulement si le rôle peut donner l'étape suivante.
+                    const n = suivante && peutDonnerStatut(role, suivante) ? suivante : null;
                     return (
                       <article key={c.id} className="rounded-xl border border-white bg-white p-3.5 shadow-sm transition hover:border-brand-200 hover:shadow-md">
                         <button onClick={() => open(c)} className="w-full text-left">

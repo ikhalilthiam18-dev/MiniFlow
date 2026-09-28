@@ -18,6 +18,7 @@ from .permissions import (
     CHAMPS_MODIFIABLES_PAR_TOUS,
     ROLES_EDITION,
     ContactPermission,
+    statut_autorise,
     CourrierPermission,
     NotificationPermission,
 )
@@ -74,6 +75,9 @@ class CourrierViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = CourrierWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Toujours le statut initial (« Reçu » / « En préparation ») : les étapes
+        # suivantes passent par PATCH, où les droits par rôle s'appliquent.
+        serializer.validated_data.pop("statut", None)
         courrier = create_courrier_with_notification(serializer.validated_data, auteur=request.user)
         return Response(
             CourrierSerializer(courrier).data,
@@ -89,6 +93,12 @@ class CourrierViewSet(viewsets.ModelViewSet):
             )
         serializer = CourrierWriteSerializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        nouveau = serializer.validated_data.get("statut")
+        if nouveau and nouveau != instance.statut and not statut_autorise(request.user.role, nouveau):
+            return Response(
+                {"detail": f"Votre rôle ne permet pas de passer ce courrier au statut « {nouveau} »."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         instance = update_courrier(instance, serializer.validated_data, auteur=request.user)
         return Response(CourrierSerializer(instance).data)
 

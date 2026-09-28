@@ -39,6 +39,7 @@ import {
   fmtLong,
   inDays,
   joursRestants,
+  peutDonnerStatut,
   statuts,
   today,
   type AppUser,
@@ -535,12 +536,16 @@ export function CourrierDetail({
           <span className="mb-1.5 block text-xs font-semibold text-[#44584f]">Statut</span>
           <select className="control" value={c.statut} onChange={(e) => changeStatut(e.target.value)}>
             {/* Étapes propres au sens du courrier (« En préparation » : départs seulement). */}
-            {(flow.includes(c.statut) ? flow : [c.statut, ...flow]).map((x) => (
-              <option key={x}>{x}</option>
-            ))}
+            {/* Seules les étapes permises au rôle sont proposées (le statut actuel reste affiché). */}
+            {flow
+              .filter((x) => x === c.statut || peutDonnerStatut(role, x))
+              .concat(flow.includes(c.statut) ? [] : [c.statut])
+              .map((x) => (
+                <option key={x}>{x}</option>
+              ))}
           </select>
         </label>
-        {next && (
+        {next && peutDonnerStatut(role, next) && (
           <button onClick={() => changeStatut(next)} className="btn-main">
             Passer à « {next} » <ArrowRight size={15} />
           </button>

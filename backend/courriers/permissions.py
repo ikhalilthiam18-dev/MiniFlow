@@ -45,3 +45,32 @@ class NotificationPermission(permissions.BasePermission):
 # que le statut et les annotations de leurs dossiers).
 ROLES_EDITION = ROLES_FULL_ACCESS | {ROLE_CHEF}
 CHAMPS_MODIFIABLES_PAR_TOUS = {"statut", "notes"}
+
+
+# Statuts qu'un rôle peut donner à un courrier (le statut initial est
+# attribué automatiquement à la création).
+TOUS_LES_STATUTS = {
+    "Reçu",
+    "En préparation",
+    "Ventilé",
+    "En cours de traitement",
+    "En attente de signature",
+    "Signé",
+    "En attente de réponse",
+    "Traité",
+    "Expédié",
+    "Archivé",
+}
+_STATUTS_AGENT = {"En cours de traitement", "En attente de réponse", "Traité"}
+_STATUTS_CHEF = _STATUTS_AGENT | {"En préparation", "En attente de signature"}
+STATUTS_PAR_ROLE = {
+    ROLE_ADMIN: TOUS_LES_STATUTS,
+    ROLE_COURRIER: TOUS_LES_STATUTS,
+    ROLE_DGS: TOUS_LES_STATUTS - {"Reçu", "Ventilé", "Expédié", "Archivé"},
+    ROLE_CHEF: _STATUTS_CHEF,
+    ROLE_AGENT: _STATUTS_AGENT,
+}
+
+
+def statut_autorise(role: str, statut: str) -> bool:
+    return statut in STATUTS_PAR_ROLE.get(role, set())

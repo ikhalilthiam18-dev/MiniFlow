@@ -23,6 +23,8 @@ import {
 import {
   roleCourt,
   roles,
+  rolesCreation,
+  statutsParRole,
   type AppUser,
   type Courrier,
   type Notify,
@@ -55,7 +57,7 @@ const descriptionsRoles: Record<AppUser["role"], string> = {
   "Secrétariat général / Bureau du courrier":
     "Réception, enregistrement chrono, numérisation, ventilation, expédition et tenue des registres officiels.",
   "DGS / Secrétaire municipal":
-    "Supervision générale, instructions, ventilation stratégique, circuit de signature et contrôle des délais.",
+    "Supervision générale, enregistrement, instructions, circuit de signature et contrôle des délais.",
   "Chef de service municipal":
     "Courriers de son service, attribution aux agents, instructions et validation des projets de réponse.",
   "Agent communal":
@@ -250,15 +252,23 @@ export function Administration({
                 </div>
                 <p className="mt-4 text-sm leading-6 text-muted-ink">{descriptionsRoles[r]}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {["Consulter", "Créer", "Modifier", "Affecter", "Valider"].map((p, i) => {
-                    const ok = !(r === "Agent communal" && i > 2);
-                    return (
-                      <span key={p} className={`tag ${ok ? "tag-green" : "tag-gray line-through opacity-60"}`}>
-                        {p}
-                      </span>
-                    );
-                  })}
+                  {(
+                    [
+                      ["Consulter", true],
+                      ["Enregistrer", rolesCreation.includes(r)],
+                      ["Modifier un courrier", rolesCreation.includes(r)],
+                      ["Gérer comptes et services", r === "Administrateur système"],
+                    ] as const
+                  ).map(([p, ok]) => (
+                    <span key={p} className={`tag ${ok ? "tag-green" : "tag-gray line-through opacity-60"}`}>
+                      {p}
+                    </span>
+                  ))}
                 </div>
+                <p className="mt-3 text-xs leading-5 text-muted-ink">
+                  <b className="text-ink">Étapes autorisées :</b>{" "}
+                  {statutsParRole[r].length === 10 ? "toutes" : statutsParRole[r].join(", ")}
+                </p>
               </article>
             ))}
           </div>

@@ -75,13 +75,16 @@ Ouvrez http://localhost:5173.
 
 ### Rôles
 
-| Rôle | Voit | Peut |
-|---|---|---|
-| Administrateur système | Tout | Tout, plus la gestion des comptes et des services |
-| Secrétariat général / Bureau du courrier | Tous les courriers | Enregistrer, modifier, tenir les registres |
-| DGS / Secrétaire municipal | Tous les courriers | Superviser, modifier |
-| Chef de service municipal | Les courriers de son service | Enregistrer, modifier |
-| Agent communal | Ses dossiers et ceux de son service | Changer le statut, annoter |
+| Rôle | Voit | Peut | Statuts qu'il peut donner |
+|---|---|---|---|
+| Administrateur système | Tout | Tout, plus la gestion des comptes et des services | Tous |
+| Secrétariat général / Bureau du courrier | Tous les courriers | Enregistrer, modifier, tenir les registres | Tous |
+| DGS / Secrétaire municipal | Tous les courriers | Enregistrer, modifier, superviser | Tous sauf Reçu, Ventilé, Expédié, Archivé |
+| Chef de service municipal | Les courriers de son service et ceux qui lui sont affectés | Enregistrer, modifier | En préparation, En cours de traitement, En attente de signature, En attente de réponse, Traité |
+| Agent communal | Uniquement les dossiers qui lui sont affectés | Faire avancer, annoter | En cours de traitement, En attente de réponse, Traité |
+
+Le statut initial (« Reçu » ou « En préparation ») est attribué automatiquement à l'enregistrement.
+Ces règles sont appliquées par l'API (`backend/courriers/permissions.py`).
 
 ## E-mails et rappels
 

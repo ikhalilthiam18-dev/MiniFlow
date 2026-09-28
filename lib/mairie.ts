@@ -103,6 +103,25 @@ export const rolesCreation: Role[] = roles.slice(0, 4);
 /** Roles that see every courrier and every notification. */
 export const rolesVueGlobale: Role[] = roles.slice(0, 3);
 
+/**
+ * Statuts qu'un rôle peut donner à un courrier. Miroir de STATUTS_PAR_ROLE
+ * (backend/courriers/permissions.py) : le serveur reste l'autorité.
+ */
+const statutsAgent = ["En cours de traitement", "En attente de réponse", "Traité"];
+export const statutsParRole: Record<Role, string[]> = {
+  "Administrateur système": statuts,
+  "Secrétariat général / Bureau du courrier": statuts,
+  "DGS / Secrétaire municipal": statuts.filter(
+    (s) => !["Reçu", "Ventilé", "Expédié", "Archivé"].includes(s),
+  ),
+  "Chef de service municipal": statuts.filter(
+    (s) => s === "En préparation" || s === "En attente de signature" || statutsAgent.includes(s),
+  ),
+  "Agent communal": statutsAgent,
+};
+export const peutDonnerStatut = (role: Role, statut: string) =>
+  statutsParRole[role].includes(statut);
+
 export const roleCourt: Record<Role, string> = {
   "Administrateur système": "Administrateur",
   "Secrétariat général / Bureau du courrier": "Bureau du courrier",

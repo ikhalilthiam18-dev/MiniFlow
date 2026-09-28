@@ -352,6 +352,7 @@ export default function Home() {
                   onAdvance={(id, statut) => updateCourrier(id, { statut })}
                   notify={notify}
                   open={openCourrier}
+                  role={role}
                 />
               )}
               {tab === "registres" && (
