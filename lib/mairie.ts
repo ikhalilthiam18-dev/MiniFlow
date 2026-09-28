@@ -64,9 +64,10 @@ export const filtresVides: CourrierFilters = {
 /** Special statut filter value: overdue dossiers whatever their status. */
 export const FILTRE_RETARD = "En retard";
 
-export const services = [
+/** Liste de secours, utilisée seulement si le référentiel de l'API est indisponible. */
+export const servicesParDefaut = [
   "Bureau du courrier",
-  "Direction des systèmes d’information",
+  "Direction des systèmes d'information",
   "État civil",
   "Urbanisme",
   "Services techniques",

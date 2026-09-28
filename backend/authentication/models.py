@@ -30,13 +30,28 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+class Service(models.Model):
+    """Service ou direction municipale (référentiel géré par l'administrateur)."""
+
+    nom = models.CharField(max_length=255, unique=True)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "service"
+        verbose_name_plural = "services"
+
+    def __str__(self):
+        return self.nom
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField("adresse email", unique=True)
     nom = models.CharField("nom complet", max_length=255)
     role = models.CharField(max_length=80, choices=UserRole.choices, default=UserRole.AGENT)
     service = models.CharField(max_length=255)
     actif = models.BooleanField(default=True)
-    avatar = models.TextField(blank=True, help_text="Data URL de la photo de profil")
+    photo = models.FileField("photo de profil", upload_to="avatars/", blank=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 

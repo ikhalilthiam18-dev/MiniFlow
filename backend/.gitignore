@@ -6,3 +6,4 @@ venv/
 .env
 staticfiles/
 media/
+pieces_jointes/

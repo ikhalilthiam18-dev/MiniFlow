@@ -18,11 +18,14 @@ import {
   fetchCourriers,
   fetchMe,
   fetchNotifications,
+  fetchServices,
   getStoredAccessToken,
   markAllNotificationsRead,
   markNotificationRead,
   patchCourrier,
   updateProfileAvatar,
+  uploadPieces,
+  type ApiService,
 } from "@/lib/api";
 import {
   enRetard,
@@ -32,6 +35,7 @@ import {
   isClos,
   rolesCreation,
   rolesVueGlobale,
+  servicesParDefaut,
   today,
   type AppNotification,
   type AppUser,
@@ -71,6 +75,7 @@ export default function Home() {
     [users, setUsers] = useState<AppUser[]>([]),
     [notifications, setNotifications] = useState<AppNotification[]>([]),
     [avatars, setAvatars] = useState<Record<string, string>>({}),
+    [services, setServices] = useState<ApiService[]>([]),
     [booting, setBooting] = useState(true),
     [loading, setLoading] = useState(false),
     [loadError, setLoadError] = useState(""),
@@ -96,6 +101,11 @@ export default function Home() {
       setContacts(reps);
       setNotifications(notifs);
       setUsers(user.role === "Administrateur système" ? await fetchAdminUsers() : accounts);
+      setServices(
+        await fetchServices().catch(() =>
+          servicesParDefaut.map((nom, i) => ({ id: -(i + 1), nom, actif: true })),
+        ),
+      );
       if (user.avatar) setAvatars((v) => ({ ...v, [user.nom]: user.avatar! }));
     } catch {
       setLoadError(
@@ -132,6 +142,9 @@ export default function Home() {
     : notifications.filter((n) => n.destinataire === currentUser);
   const unread = visibleNotifications.filter((n) => !n.lue).length;
   const currentAccount = users.find((u) => u.nom === currentUser);
+  // Tous les services servent au filtrage ; seuls les actifs sont proposés à la saisie.
+  const nomsServices = services.map((s) => s.nom);
+  const nomsServicesActifs = services.filter((s) => s.actif).map((s) => s.nom);
   const avatar = avatars[currentUser];
   const filtered = useMemo(() => filtrerCourriers(scopedItems, filters), [scopedItems, filters]);
   const stats: Stats = {
@@ -201,6 +214,17 @@ export default function Home() {
       setDialog(null);
       notify(`${c.numero} enregistré dans le registre ${sens.toLowerCase()}`);
       fetchNotifications().then(setNotifications).catch(() => {});
+      const fichiers = fd.getAll("fichiers").filter((f): f is File => f instanceof File && f.size > 0);
+      if (fichiers.length) {
+        uploadPieces(c.id, fichiers)
+          .then((p) => notify(`${p.length} pièce(s) jointe(s) ajoutée(s) à ${c.numero}`))
+          .catch((err) =>
+            notify(
+              `${c.numero} est enregistré, mais les pièces jointes n’ont pas pu être envoyées : ${err instanceof Error ? err.message : "erreur"}. Ajoutez-les depuis la fiche du courrier.`,
+              "error",
+            ),
+          );
+      }
     } catch {
       notify("Erreur lors de l’enregistrement du courrier", "error");
     }
@@ -223,6 +247,7 @@ export default function Home() {
     setUsers([]);
     setNotifications([]);
     setAvatars({});
+    setServices([]);
     notify("Vous êtes déconnecté", "info");
   };
 
@@ -318,6 +343,7 @@ export default function Home() {
                   }}
                   canCreate={canCreate}
                   onCreate={setDialog}
+                  services={nomsServices}
                 />
               )}
               {tab === "circuit" && (
@@ -344,7 +370,14 @@ export default function Home() {
                 <Contacts contacts={contacts} onAdded={(c) => setContacts((v) => [...v, c])} notify={notify} />
               )}
               {tab === "administration" && role === "Administrateur système" && (
-                <Administration users={users} items={scopedItems} onUsersChange={setUsers} notify={notify} />
+                <Administration
+                  users={users}
+                  items={scopedItems}
+                  services={services}
+                  onUsersChange={setUsers}
+                  onServicesChange={setServices}
+                  notify={notify}
+                />
               )}
             </div>
           )}
@@ -364,7 +397,12 @@ export default function Home() {
               Les champs marqués d’un astérisque sont obligatoires. Le numéro chrono est attribué automatiquement.
             </DialogDescription>
           </DialogHeader>
-          <MailForm sens={dialog === "out" ? "Départ" : "Arrivée"} onSubmit={add} users={users} />
+          <MailForm
+            sens={dialog === "out" ? "Départ" : "Arrivée"}
+            onSubmit={add}
+            users={users}
+            services={nomsServicesActifs}
+          />
         </DialogContent>
       </Dialog>
 
@@ -374,14 +412,27 @@ export default function Home() {
             <CourrierDetail
               key={selected.id}
               c={selected}
+              canEdit={canCreate}
+              users={users}
+              services={nomsServicesActifs}
+              userName={currentUser}
+              role={role}
+              notify={notify}
               onUpdate={async (patch) => {
                 try {
                   const updated = await updateCourrier(selected.id, patch);
                   setSelected(updated);
-                  notify(patch.statut ? `Statut mis à jour : ${patch.statut}` : "Annotation enregistrée");
+                  const champs = Object.keys(patch);
+                  notify(
+                    champs.length === 1 && patch.statut
+                      ? `Statut mis à jour : ${patch.statut}`
+                      : champs.length === 1 && "notes" in patch
+                        ? "Annotation enregistrée"
+                        : "Courrier modifié",
+                  );
                   return true;
-                } catch {
-                  notify("Impossible d’enregistrer la modification", "error");
+                } catch (err) {
+                  notify(err instanceof Error ? err.message : "Impossible d’enregistrer la modification", "error");
                   return false;
                 }
               }}

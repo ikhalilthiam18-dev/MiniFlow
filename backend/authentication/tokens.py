@@ -23,5 +23,5 @@ class Courrier360TokenObtainPairSerializer(TokenObtainPairSerializer):
                 "Ce compte municipal est désactivé. Contactez l'administrateur.",
                 code="account_disabled",
             )
-        data["user"] = UserSerializer(user).data
+        data["user"] = UserSerializer(user, context=self.context).data
         return data

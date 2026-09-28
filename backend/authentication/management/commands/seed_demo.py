@@ -5,6 +5,7 @@ from django.db import transaction
 
 from authentication.models import User, UserRole
 from courriers.models import Contact, Courrier
+from courriers.services import trouver_agent
 
 
 class Command(BaseCommand):
@@ -146,6 +147,7 @@ class Command(BaseCommand):
                 statut=row[8],
                 echeance=row[9],
                 responsable=row[10],
+                agent=trouver_agent(row[10], actifs_seulement=False),
                 signataire=row[11],
                 notes=row[12],
             )

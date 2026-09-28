@@ -6,12 +6,14 @@ from .views import (
     LoginView,
     MeView,
     PasswordChangeView,
+    ServiceViewSet,
     UserListForAppView,
     UserViewSet,
 )
 
 router = DefaultRouter()
 router.register("users", UserViewSet, basename="admin-users")
+router.register("services", ServiceViewSet, basename="services")
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),

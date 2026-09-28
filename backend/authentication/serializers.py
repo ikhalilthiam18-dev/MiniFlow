@@ -3,14 +3,36 @@ import secrets
 from django.contrib.auth import password_validation
 from rest_framework import serializers
 
-from .models import User
+from .models import Service, User
+
+
+def valider_service(value):
+    value = value.replace("\u2019", "'").strip()
+    if not Service.objects.filter(nom=value, actif=True).exists():
+        raise serializers.ValidationError("Service inconnu ou désactivé.")
+    return value
 
 
 class UserSerializer(serializers.ModelSerializer):
+    # URL absolue de la photo (le frontend est servi sur un autre port que l'API).
+    avatar = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ("id", "nom", "email", "role", "service", "actif", "avatar")
         read_only_fields = ("id",)
+
+    def get_avatar(self, user):
+        if not user.photo:
+            return ""
+        request = self.context.get("request")
+        return request.build_absolute_uri(user.photo.url) if request else user.photo.url
+
+
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ("id", "nom", "actif")
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
@@ -27,6 +49,9 @@ class UserAdminSerializer(serializers.ModelSerializer):
         if value:
             password_validation.validate_password(value)
         return value
+
+    def validate_service(self, value):
+        return valider_service(value)
 
     def create(self, validated_data):
         password = validated_data.pop("password", "") or secrets.token_urlsafe(16)

@@ -1,13 +1,19 @@
+import base64
+import binascii
+import uuid
+
+from django.core.files.base import ContentFile
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import User
+from .models import Service, User
 from .serializers import (
     AdminSetPasswordSerializer,
     PasswordChangeSerializer,
+    ServiceSerializer,
     UserAdminSerializer,
     UserSerializer,
 )
@@ -26,11 +32,40 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
     def patch(self, request, *args, **kwargs):
+        """Photo de profil : data URL (JPEG, PNG ou WebP, 2 Mo max) ou "" pour la retirer."""
         avatar = request.data.get("avatar")
+        user = request.user
         if avatar is not None:
-            request.user.avatar = avatar
-            request.user.save(update_fields=["avatar"])
-        return Response(UserSerializer(request.user).data)
+            fichier = None
+            if avatar:
+                try:
+                    fichier = photo_depuis_data_url(avatar)
+                except ValueError as err:
+                    return Response({"avatar": [str(err)]}, status=status.HTTP_400_BAD_REQUEST)
+            if user.photo:
+                user.photo.delete(save=False)
+            if fichier:
+                user.photo.save(fichier.name, fichier, save=False)
+            user.save(update_fields=["photo"])
+        return Response(UserSerializer(user, context={"request": request}).data)
+
+
+TYPES_PHOTO = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+TAILLE_MAX_PHOTO = 2 * 1024 * 1024
+
+
+def photo_depuis_data_url(data_url: str) -> ContentFile:
+    entete, _, contenu = data_url.partition(",")
+    ext = TYPES_PHOTO.get(entete.removeprefix("data:").removesuffix(";base64"))
+    if not ext or not entete.endswith(";base64"):
+        raise ValueError("Format accepté : JPG, PNG ou WebP.")
+    try:
+        donnees = base64.b64decode(contenu, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("Image illisible.")
+    if len(donnees) > TAILLE_MAX_PHOTO:
+        raise ValueError("La photo ne doit pas dépasser 2 Mo.")
+    return ContentFile(donnees, name=f"{uuid.uuid4().hex}.{ext}")
 
 
 class PasswordChangeView(generics.GenericAPIView):
@@ -84,3 +119,16 @@ class UserListForAppView(generics.ListAPIView):
 
     def get_queryset(self):
         return User.objects.filter(actif=True).order_by("nom")
+
+
+class ServiceViewSet(viewsets.ModelViewSet):
+    """Référentiel des services : lecture pour tous, gestion par l'administrateur."""
+
+    serializer_class = ServiceSerializer
+    queryset = Service.objects.all()
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), IsSystemAdmin()]

@@ -35,8 +35,33 @@ export type ApiCourrier = {
   statut: string;
   echeance: string;
   responsable: string;
+  /** Compte de l'agent responsable (null si aucun compte ne correspond). */
+  agent?: number | null;
   signataire?: string;
   notes?: string;
+};
+
+export type ApiService = {
+  id: number;
+  nom: string;
+  actif: boolean;
+};
+
+export type ApiPiece = {
+  id: number;
+  nom: string;
+  taille: number;
+  type_mime: string;
+  ajoute_par: string;
+  date: string;
+};
+
+export type ApiHistorique = {
+  id: number;
+  ancien_statut: string;
+  nouveau_statut: string;
+  auteur: string;
+  date: string;
 };
 
 export type ApiContact = {
@@ -100,13 +125,12 @@ function errorMessage(body: unknown): string {
     .join(" ");
 }
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+/** Requête authentifiée brute (renouvelle le jeton si besoin) ; lève une erreur lisible. */
+async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   let token = getStoredAccessToken();
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body) {
+  // FormData (envoi de fichiers) : le navigateur fixe lui-même le Content-Type.
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -128,6 +152,11 @@ export async function apiFetch<T>(
     }
     throw new Error(detail);
   }
+  return res;
+}
+
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await authFetch(path, options);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -263,4 +292,51 @@ export async function markNotificationRead(id: number): Promise<void> {
 
 export async function markAllNotificationsRead(): Promise<void> {
   await apiFetch("/api/notifications/tout_lire/", { method: "POST" });
+}
+
+export async function fetchHistorique(courrierId: number): Promise<ApiHistorique[]> {
+  return apiFetch<ApiHistorique[]>(`/api/courriers/${courrierId}/historique/`);
+}
+
+export async function fetchServices(): Promise<ApiService[]> {
+  return apiFetch<ApiService[]>("/api/auth/services/");
+}
+
+export async function createService(nom: string): Promise<ApiService> {
+  return apiFetch<ApiService>("/api/auth/services/", {
+    method: "POST",
+    body: JSON.stringify({ nom }),
+  });
+}
+
+export async function patchService(id: number, body: Partial<ApiService>): Promise<ApiService> {
+  return apiFetch<ApiService>(`/api/auth/services/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchPieces(courrierId: number): Promise<ApiPiece[]> {
+  return apiFetch<ApiPiece[]>(`/api/courriers/${courrierId}/pieces/`);
+}
+
+export async function uploadPieces(courrierId: number, fichiers: File[]): Promise<ApiPiece[]> {
+  const body = new FormData();
+  fichiers.forEach((f) => body.append("fichiers", f));
+  return apiFetch<ApiPiece[]>(`/api/courriers/${courrierId}/pieces/`, { method: "POST", body });
+}
+
+export async function deletePiece(courrierId: number, pieceId: number): Promise<void> {
+  await apiFetch(`/api/courriers/${courrierId}/pieces/${pieceId}/`, { method: "DELETE" });
+}
+
+/** Télécharge une pièce jointe (requête authentifiée) et l'enregistre sur le poste. */
+export async function downloadPiece(courrierId: number, piece: ApiPiece): Promise<void> {
+  const res = await authFetch(`/api/courriers/${courrierId}/pieces/${piece.id}/`);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = piece.nom;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

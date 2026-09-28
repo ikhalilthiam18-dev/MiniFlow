@@ -303,7 +303,7 @@ export default function Landing({ onLogin }: { onLogin: () => void }) {
               light
               eyebrow="Comment ça marche"
               title="Un circuit clair, en quatre étapes"
-              text="Chaque étape est horodatée et visible par les personnes concernées."
+              text="Chaque étape est horodatée, avec son auteur, et visible par les agents et responsables concernés."
             />
             <ol className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               {steps.map(([t, d], i) => (

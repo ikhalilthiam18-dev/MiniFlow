@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import User
+from .models import Service, User
 
 
 @admin.register(User)
@@ -13,7 +13,7 @@ class UserAdmin(DjangoUserAdmin):
     list_per_page = 25
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Profil municipal", {"fields": ("nom", "role", "service", "actif", "avatar")}),
+        ("Profil municipal", {"fields": ("nom", "role", "service", "actif", "photo")}),
         ("Permissions", {"fields": ("is_staff", "is_superuser", "groups", "user_permissions")}),
     )
     add_fieldsets = (
@@ -25,3 +25,10 @@ class UserAdmin(DjangoUserAdmin):
             },
         ),
     )
+
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+    list_display = ("nom", "actif")
+    list_filter = ("actif",)
+    search_fields = ("nom",)

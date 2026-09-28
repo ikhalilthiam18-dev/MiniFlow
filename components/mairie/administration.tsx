@@ -12,11 +12,17 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
-import { adminSetPassword, createAdminUser, patchAdminUser } from "@/lib/api";
+import {
+  adminSetPassword,
+  createAdminUser,
+  createService,
+  patchAdminUser,
+  patchService,
+  type ApiService,
+} from "@/lib/api";
 import {
   roleCourt,
   roles,
-  services,
   type AppUser,
   type Courrier,
   type Notify,
@@ -59,15 +65,39 @@ const descriptionsRoles: Record<AppUser["role"], string> = {
 export function Administration({
   users,
   items,
+  services,
   onUsersChange,
+  onServicesChange,
   notify,
 }: {
   users: AppUser[];
   items: Courrier[];
+  services: ApiService[];
   onUsersChange: React.Dispatch<React.SetStateAction<AppUser[]>>;
+  onServicesChange: React.Dispatch<React.SetStateAction<ApiService[]>>;
   notify: Notify;
 }) {
   const [view, setView] = useState("utilisateurs");
+  const [nouveauService, setNouveauService] = useState("");
+  const [serviceBusy, setServiceBusy] = useState<number | "new" | null>(null);
+  const [serviceAction, setServiceAction] = useState<ApiService | null>(null);
+  const servicesActifs = services.filter((s) => s.actif);
+  const ajouterService = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const nom = nouveauService.trim();
+    if (!nom) return;
+    setServiceBusy("new");
+    try {
+      const s = await createService(nom);
+      onServicesChange((v) => [...v, s].sort((a, b) => a.nom.localeCompare(b.nom)));
+      setNouveauService("");
+      notify(`Service « ${s.nom} » ajouté`);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Impossible d’ajouter le service", "error");
+    } finally {
+      setServiceBusy(null);
+    }
+  };
   const [q, setQ] = useState("");
   const [roleFiltre, setRoleFiltre] = useState("Tous");
   const [creating, setCreating] = useState(false);
@@ -235,46 +265,71 @@ export function Administration({
         </TabsContent>
 
         <TabsContent value="services">
-          <div className="card overflow-x-auto">
-            <table className="data-table min-w-[720px]">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Service</th>
-                  <th>Agents</th>
-                  <th>Courriers</th>
-                  <th className="text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {services.map((s, i) => (
-                  <tr key={s}>
-                    <td className="text-xs font-bold text-muted-ink">SRV-{String(i + 1).padStart(2, "0")}</td>
-                    <td>
-                      <span className="flex items-center gap-2.5 font-semibold">
-                        <Building size={16} className="text-brand-600" /> {s}
-                      </span>
-                    </td>
-                    <td>{users.filter((u) => u.service === s && u.actif).length}</td>
-                    <td>{items.filter((c) => c.service === s).length}</td>
-                    <td className="text-right">
-                      <button onClick={() => notify(`Paramètres de « ${s} » ouverts`, "info")} className="btn-light btn-sm">
-                        Configurer
-                      </button>
-                    </td>
+          <div className="card overflow-hidden">
+            <form onSubmit={ajouterService} className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row">
+              <label className="field-row flex-1">
+                <Building size={16} />
+                <input
+                  value={nouveauService}
+                  onChange={(e) => setNouveauService(e.target.value)}
+                  placeholder="Nom du nouveau service ou de la direction…"
+                  aria-label="Nom du nouveau service"
+                />
+              </label>
+              <button disabled={!nouveauService.trim() || serviceBusy === "new"} className="btn-main">
+                {serviceBusy === "new" ? <Spinner className="size-4" /> : <Plus size={16} />} Ajouter le service
+              </button>
+            </form>
+            <div className="overflow-x-auto">
+              <table className="data-table min-w-[720px]">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Agents actifs</th>
+                    <th>Courriers</th>
+                    <th>État</th>
+                    <th className="text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {services.map((s) => (
+                    <tr key={s.id} className={s.actif ? "" : "opacity-60"}>
+                      <td>
+                        <span className="flex items-center gap-2.5 font-semibold">
+                          <Building size={16} className="text-brand-600" /> {s.nom}
+                        </span>
+                      </td>
+                      <td>{users.filter((u) => u.service === s.nom && u.actif).length}</td>
+                      <td>{items.filter((c) => c.service === s.nom).length}</td>
+                      <td>
+                        <Badge tone={s.actif ? "green" : "gray"}>{s.actif ? "Actif" : "Désactivé"}</Badge>
+                      </td>
+                      <td className="text-right">
+                        <button
+                          onClick={() => setServiceAction(s)}
+                          disabled={serviceBusy === s.id}
+                          className={`${s.actif ? "btn-light" : "btn-main"} btn-sm`}
+                        >
+                          {s.actif ? "Désactiver" : "Réactiver"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="border-t border-line px-5 py-3 text-xs text-muted-ink">
+              Un service désactivé n’est plus proposé pour les nouveaux courriers et comptes ; les dossiers existants restent inchangés.
+            </p>
           </div>
         </TabsContent>
 
         <TabsContent value="parametres">
           <div className="grid gap-4 md:grid-cols-2">
-            <Setting icon={ListOrdered} title="Numérotation annuelle" text="ARR-{année}-{chrono} et DEP-{année}-{chrono}" />
-            <Setting icon={ShieldCheck} title="Sécurité des comptes" text="Verrouillage après 5 échecs • session de 30 minutes" />
-            <Setting icon={KeyRound} title="Réinitialisation" text="Mot de passe provisoire défini par l’administrateur, modifiable par l’agent depuis son profil" />
-            <Setting icon={ScrollText} title="Journalisation" text="Connexions, changements de rôles et actions sensibles conservés" />
+            <Setting icon={ListOrdered} title="Numérotation des courriers" text="Attribuée automatiquement : ARR-{année}-{chrono} pour les arrivées, DEP-{année}-{chrono} pour les départs • repart à 0001 chaque année, sans doublon possible" />
+            <Setting icon={ShieldCheck} title="Sessions" text="Session de 60 minutes, prolongée automatiquement pendant 7 jours • un compte désactivé ne peut plus se connecter" />
+            <Setting icon={KeyRound} title="Mots de passe" text="8 caractères minimum, ni trop courant, ni uniquement numérique • mot de passe provisoire défini par l’administrateur, modifiable par l’agent depuis son profil" />
+            <Setting icon={ScrollText} title="Traçabilité" text="Chaque changement de statut d’un courrier est enregistré (date et auteur) et consultable dans sa fiche • les modifications faites dans l’administration Django sont également historisées" />
           </div>
         </TabsContent>
       </Tabs>
@@ -303,8 +358,8 @@ export function Administration({
             </Field>
             <Field label="Service">
               <select name="service">
-                {services.map((s) => (
-                  <option key={s}>{s}</option>
+                {servicesActifs.map((s) => (
+                  <option key={s.id}>{s.nom}</option>
                 ))}
               </select>
             </Field>
@@ -369,6 +424,32 @@ export function Administration({
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!serviceAction}
+        onOpenChange={(o) => !o && setServiceAction(null)}
+        danger={serviceAction?.actif}
+        title={serviceAction?.actif ? "Désactiver ce service ?" : "Réactiver ce service ?"}
+        description={
+          serviceAction?.actif
+            ? `« ${serviceAction?.nom} » ne sera plus proposé pour les nouveaux courriers et comptes.`
+            : `« ${serviceAction?.nom} » sera de nouveau proposé.`
+        }
+        confirmLabel={serviceAction?.actif ? "Désactiver" : "Réactiver"}
+        onConfirm={async () => {
+          if (!serviceAction) return;
+          setServiceBusy(serviceAction.id);
+          try {
+            const maj = await patchService(serviceAction.id, { actif: !serviceAction.actif });
+            onServicesChange((v) => v.map((x) => (x.id === maj.id ? maj : x)));
+            notify(maj.actif ? "Service réactivé" : "Service désactivé");
+          } catch {
+            notify("Action impossible", "error");
+          } finally {
+            setServiceBusy(null);
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={!!toggle}

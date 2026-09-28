@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { BookOpen, Download, FileText, Printer } from "lucide-react";
-import { fmt, type Courrier, type Notify } from "@/lib/mairie";
+import { fmt, isClos, type Courrier, type Notify } from "@/lib/mairie";
+import { AccuseReception, Bordereau, usePrint } from "./documents";
 import { Empty, PageHead, Pagination, SectionTitle, StatusBadge, usePagination } from "./ui";
 
 type Sens = Courrier["sens"];
@@ -125,18 +126,7 @@ export function Registres({
         )}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <Doc
-          title="Accusé de réception"
-          text="Générer un accusé comportant le numéro chrono, la date et le cachet du bureau du courrier."
-          notify={notify}
-        />
-        <Doc
-          title="Bordereau de transmission"
-          text="Éditer la liste des courriers ventilés vers un service avec émargement."
-          notify={notify}
-        />
-      </div>
+      <Documents items={items} notify={notify} />
 
       {printing && (
         <div className="print-area">
@@ -174,18 +164,78 @@ export function Registres({
   );
 }
 
-function Doc({ title, text, notify }: { title: string; text: string; notify: Notify }) {
+function Documents({ items, notify }: { items: Courrier[]; notify: Notify }) {
+  const { zone, imprimer } = usePrint();
+  const arrivees = [...items]
+    .filter((c) => c.sens === "Arrivée")
+    .sort((a, b) => b.numero.localeCompare(a.numero));
+  const services = [...new Set(items.filter((c) => !isClos(c)).map((c) => c.service))].sort();
+  const [courrierId, setCourrierId] = useState("");
+  const [service, setService] = useState("");
+  const aTransmettre = items
+    .filter((c) => c.service === service && !isClos(c))
+    .sort((a, b) => a.numero.localeCompare(b.numero));
+  return (
+    <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <DocCard
+        title="Accusé de réception"
+        text="Document remis à l’expéditeur : numéro chrono, date de réception, objet et cachet du bureau du courrier."
+      >
+        <select className="control" value={courrierId} onChange={(e) => setCourrierId(e.target.value)} aria-label="Courrier arrivée">
+          <option value="">Choisir un courrier arrivée…</option>
+          {arrivees.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.numero} — {c.tiers}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={!courrierId}
+          onClick={() => {
+            const c = items.find((x) => String(x.id) === courrierId);
+            if (c) imprimer(<AccuseReception c={c} />);
+          }}
+          className="btn-main"
+        >
+          <Printer size={16} /> Imprimer / PDF
+        </button>
+      </DocCard>
+      <DocCard
+        title="Bordereau de transmission"
+        text="Liste des dossiers en cours d’un service, avec une colonne d’émargement pour la remise."
+      >
+        <select className="control" value={service} onChange={(e) => setService(e.target.value)} aria-label="Service destinataire">
+          <option value="">Choisir un service…</option>
+          {services.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+        <button
+          disabled={!service}
+          onClick={() => {
+            if (!aTransmettre.length) return notify("Aucun dossier en cours pour ce service", "info");
+            imprimer(<Bordereau service={service} items={aTransmettre} />);
+          }}
+          className="btn-main"
+        >
+          <Printer size={16} /> Imprimer / PDF{service ? ` (${aTransmettre.length})` : ""}
+        </button>
+      </DocCard>
+      {zone}
+    </div>
+  );
+}
+
+function DocCard({ title, text, children }: { title: string; text: string; children: React.ReactNode }) {
   return (
     <div className="card flex items-start gap-4 p-5">
       <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700">
         <FileText size={20} />
       </span>
-      <div>
+      <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-ink">{title}</h3>
         <p className="mt-1 text-sm leading-6 text-muted-ink">{text}</p>
-        <button onClick={() => notify(`${title} prêt à être édité`, "info")} className="mt-2 text-sm font-semibold text-brand-700 hover:underline">
-          Créer le document →
-        </button>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">{children}</div>
       </div>
     </div>
   );

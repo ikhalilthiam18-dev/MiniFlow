@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -10,7 +10,24 @@ import {
   Save,
   Search,
   SearchX,
+  History,
+  Paperclip,
+  Pencil,
+  Printer,
+  Trash2,
+  Upload,
+  X,
 } from "lucide-react";
+import {
+  deletePiece,
+  downloadPiece,
+  fetchHistorique,
+  fetchPieces,
+  uploadPieces,
+  type ApiHistorique,
+  type ApiPiece,
+} from "@/lib/api";
+import { AccuseReception, usePrint } from "./documents";
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   enRetard,
@@ -18,15 +35,17 @@ import {
   FILTRE_RETARD,
   filtresVides,
   fmt,
+  fmtDateTime,
   fmtLong,
   inDays,
   joursRestants,
-  services,
   statuts,
   today,
   type AppUser,
   type Courrier,
   type CourrierFilters,
+  type Notify,
+  type Role,
 } from "@/lib/mairie";
 import {
   ConfirmDialog,
@@ -49,8 +68,10 @@ export function CourriersPage({
   onExport,
   canCreate,
   onCreate,
+  services,
 }: {
   items: Courrier[];
+  services: string[];
   filters: CourrierFilters;
   setFilters: (f: CourrierFilters) => void;
   open: (x: Courrier) => void;
@@ -250,10 +271,12 @@ export function MailForm({
   sens,
   onSubmit,
   users,
+  services,
 }: {
   sens: "Arrivée" | "Départ";
   onSubmit: (f: FormData, s: "Arrivée" | "Départ") => Promise<void>;
   users: AppUser[];
+  services: string[];
 }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -335,8 +358,8 @@ export function MailForm({
             </select>
           </Field>
         )}
-        <Field label="Pièces jointes" wide hint="PDF, JPG ou PNG. Les fichiers ne sont pas encore transmis au serveur.">
-          <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" />
+        <Field label="Pièces jointes" wide hint="PDF, JPG ou PNG • 10 Mo maximum par fichier, 10 fichiers au plus.">
+          <input name="fichiers" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" />
         </Field>
       </div>
       <div className="flex justify-end gap-2 border-t border-line pt-5">
@@ -352,13 +375,40 @@ export function MailForm({
 export function CourrierDetail({
   c,
   onUpdate,
+  canEdit,
+  users,
+  services,
+  userName,
+  role,
+  notify,
 }: {
   c: Courrier;
   onUpdate: (patch: Partial<Courrier>) => Promise<boolean>;
+  /** Rôles autorisés à modifier le contenu (les agents : statut et annotations). */
+  canEdit: boolean;
+  users: AppUser[];
+  services: string[];
+  userName: string;
+  role: Role;
+  notify: Notify;
 }) {
+  const [edition, setEdition] = useState(false);
+  const { zone: zoneImpression, imprimer } = usePrint();
   const [notes, setNotes] = useState(c.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [historique, setHistorique] = useState<ApiHistorique[] | null>(null);
+  const [histErreur, setHistErreur] = useState(false);
+  useEffect(() => {
+    // Recharge l'historique à l'ouverture et après chaque changement de statut.
+    let actif = true;
+    fetchHistorique(c.id)
+      .then((h) => actif && setHistorique(h))
+      .catch(() => actif && setHistErreur(true));
+    return () => {
+      actif = false;
+    };
+  }, [c.id, c.statut]);
   const next = etapeSuivante(c);
   const flow = c.sens === "Départ" ? statuts : statuts.filter((x) => x !== "En préparation");
   const idx = flow.indexOf(c.statut);
@@ -379,7 +429,31 @@ export function CourrierDetail({
         <DialogDescription>
           {c.sens === "Arrivée" ? "Reçu" : "Émis"} le {fmtLong(c.date)}
         </DialogDescription>
+        <div className="flex flex-wrap gap-2 pt-2">
+          {canEdit && !edition && (
+            <button onClick={() => setEdition(true)} className="btn-light btn-sm">
+              <Pencil size={14} /> Modifier
+            </button>
+          )}
+          {c.sens === "Arrivée" && (
+            <button onClick={() => imprimer(<AccuseReception c={c} />)} className="btn-light btn-sm">
+              <Printer size={14} /> Accusé de réception
+            </button>
+          )}
+        </div>
       </DialogHeader>
+
+      {edition && (
+        <EditionCourrier
+          c={c}
+          users={users}
+          services={services}
+          onCancel={() => setEdition(false)}
+          onSave={async (patch) => {
+            if (await onUpdate(patch)) setEdition(false);
+          }}
+        />
+      )}
 
       <div className="rounded-2xl border border-line bg-brand-50/60 p-5">
         <p className="eyebrow">Objet</p>
@@ -422,11 +496,46 @@ export function CourrierDetail({
         <Info l="Signataire" v={c.signataire || "—"} />
       </dl>
 
+      <section>
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#44584f]">
+          <History size={14} className="text-brand-700" /> Historique des statuts
+        </p>
+        {histErreur ? (
+          <p className="text-xs text-muted-ink">Historique indisponible pour le moment.</p>
+        ) : historique === null ? (
+          <p className="flex items-center gap-2 text-xs text-muted-ink">
+            <Spinner className="size-3.5" /> Chargement…
+          </p>
+        ) : historique.length === 0 ? (
+          <p className="text-xs text-muted-ink">
+            Aucun changement enregistré (dossier créé avant la mise en place de l’historique).
+          </p>
+        ) : (
+          <ol className="space-y-2 border-l-2 border-brand-100 pl-4">
+            {historique.map((h) => (
+              <li key={h.id} className="relative text-sm">
+                <span className="absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-white bg-brand-600" />
+                <b className="text-ink">
+                  {h.ancien_statut ? `${h.ancien_statut} → ${h.nouveau_statut}` : `Enregistré : ${h.nouveau_statut}`}
+                </b>
+                <span className="block text-xs text-muted-ink">
+                  {fmtDateTime(h.date)}
+                  {h.auteur ? ` · ${h.auteur}` : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <PiecesJointes courrierId={c.id} userName={userName} role={role} notify={notify} />
+
       <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="block">
           <span className="mb-1.5 block text-xs font-semibold text-[#44584f]">Statut</span>
           <select className="control" value={c.statut} onChange={(e) => changeStatut(e.target.value)}>
-            {statuts.map((x) => (
+            {/* Étapes propres au sens du courrier (« En préparation » : départs seulement). */}
+            {(flow.includes(c.statut) ? flow : [c.statut, ...flow]).map((x) => (
               <option key={x}>{x}</option>
             ))}
           </select>
@@ -473,7 +582,235 @@ export function CourrierDetail({
           await onUpdate({ statut: "Archivé" });
         }}
       />
+      {zoneImpression}
     </>
+  );
+}
+
+function EditionCourrier({
+  c,
+  users,
+  services,
+  onCancel,
+  onSave,
+}: {
+  c: Courrier;
+  users: AppUser[];
+  services: string[];
+  onCancel: () => void;
+  onSave: (patch: Partial<Courrier>) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  // Le service actuel reste proposé même s'il a été désactivé depuis.
+  const choixServices = services.includes(c.service) ? services : [c.service, ...services];
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const patch: Partial<Courrier> = {
+          tiers: String(f.get("tiers")),
+          objet: String(f.get("objet")),
+          service: String(f.get("service")),
+          type: String(f.get("type")),
+          priorite: String(f.get("priorite")) as Courrier["priorite"],
+          echeance: String(f.get("echeance")),
+          responsable: String(f.get("responsable")),
+          signataire: String(f.get("signataire") ?? c.signataire ?? ""),
+        };
+        // N'envoyer que ce qui a changé (l'historique et les notifications en dépendent).
+        const modifie = Object.fromEntries(
+          Object.entries(patch).filter(([k, v]) => v !== (c[k as keyof Courrier] ?? "")),
+        ) as Partial<Courrier>;
+        if (!Object.keys(modifie).length) return onCancel();
+        setBusy(true);
+        try {
+          await onSave(modifie);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="grid gap-3 rounded-2xl border border-brand-200 bg-brand-50/40 p-4 sm:grid-cols-2"
+    >
+      <p className="eyebrow sm:col-span-2">Modifier le courrier</p>
+      <Field label={c.sens === "Arrivée" ? "Expéditeur" : "Destinataire"} wide required>
+        <input name="tiers" defaultValue={c.tiers} required />
+      </Field>
+      <Field label="Objet" wide required>
+        <textarea name="objet" rows={2} defaultValue={c.objet} required />
+      </Field>
+      <Field label="Service">
+        <select name="service" defaultValue={c.service}>
+          {choixServices.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Échéance" required>
+        <input name="echeance" type="date" defaultValue={c.echeance} required />
+      </Field>
+      <Field label={c.sens === "Arrivée" ? "Type de courrier" : "Mode d’envoi"}>
+        <input name="type" defaultValue={c.type} required />
+      </Field>
+      <Field label="Priorité">
+        <select name="priorite" defaultValue={c.priorite}>
+          <option>Normale</option>
+          <option>Urgente</option>
+        </select>
+      </Field>
+      <Field label="Responsable" hint="Un changement d’agent lui envoie une notification.">
+        <select name="responsable" defaultValue={c.responsable}>
+          {!users.some((u) => u.nom === c.responsable) && <option>{c.responsable}</option>}
+          {users
+            .filter((u) => u.actif && u.role !== "Administrateur système")
+            .map((u) => (
+              <option key={u.id} value={u.nom}>
+                {u.nom} — {u.service}
+              </option>
+            ))}
+        </select>
+      </Field>
+      {c.sens === "Départ" && (
+        <Field label="Signataire">
+          <input name="signataire" defaultValue={c.signataire ?? ""} />
+        </Field>
+      )}
+      <div className="flex justify-end gap-2 sm:col-span-2">
+        <button type="button" onClick={onCancel} className="btn-ghost btn-sm">
+          <X size={14} /> Annuler
+        </button>
+        <button disabled={busy} className="btn-main btn-sm">
+          {busy ? <Spinner className="size-3.5" /> : <Save size={14} />} Enregistrer les modifications
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const taille = (o: number) =>
+  o < 1024 * 1024 ? `${Math.max(1, Math.round(o / 1024))} Ko` : `${(o / 1024 / 1024).toFixed(1)} Mo`;
+
+function PiecesJointes({
+  courrierId,
+  userName,
+  role,
+  notify,
+}: {
+  courrierId: number;
+  userName: string;
+  role: Role;
+  notify: Notify;
+}) {
+  const [pieces, setPieces] = useState<ApiPiece[] | null>(null);
+  const [erreur, setErreur] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [aSupprimer, setASupprimer] = useState<ApiPiece | null>(null);
+  useEffect(() => {
+    let actif = true;
+    fetchPieces(courrierId)
+      .then((p) => actif && setPieces(p))
+      .catch(() => actif && setErreur(true));
+    return () => {
+      actif = false;
+    };
+  }, [courrierId]);
+  const peutSupprimer = (p: ApiPiece) =>
+    role === "Administrateur système" ||
+    role === "Secrétariat général / Bureau du courrier" ||
+    p.ajoute_par === userName;
+  const ajouter = async (fichiers: File[]) => {
+    if (!fichiers.length) return;
+    setEnvoi(true);
+    try {
+      const nouvelles = await uploadPieces(courrierId, fichiers);
+      setPieces((v) => [...(v ?? []), ...nouvelles]);
+      notify(`${nouvelles.length} pièce(s) jointe(s) ajoutée(s)`);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Envoi impossible", "error");
+    } finally {
+      setEnvoi(false);
+    }
+  };
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-[#44584f]">
+          <Paperclip size={14} className="text-brand-700" /> Pièces jointes
+          {pieces && pieces.length > 0 && <span className="tag tag-gray px-1.5 py-0">{pieces.length}</span>}
+        </p>
+        <label className={`btn-light btn-sm cursor-pointer ${envoi ? "pointer-events-none opacity-60" : ""}`}>
+          {envoi ? <Spinner className="size-3.5" /> : <Upload size={14} />} Ajouter
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png"
+            className="hidden"
+            onChange={(e) => {
+              void ajouter(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+      {erreur ? (
+        <p className="text-xs text-muted-ink">Pièces jointes indisponibles pour le moment.</p>
+      ) : pieces === null ? (
+        <p className="flex items-center gap-2 text-xs text-muted-ink">
+          <Spinner className="size-3.5" /> Chargement…
+        </p>
+      ) : pieces.length === 0 ? (
+        <p className="text-xs text-muted-ink">Aucune pièce jointe. Formats acceptés : PDF, JPG, PNG (10 Mo max).</p>
+      ) : (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {pieces.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
+              <Paperclip size={15} className="shrink-0 text-muted-ink" />
+              <button
+                onClick={() => downloadPiece(courrierId, p).catch(() => notify("Téléchargement impossible", "error"))}
+                className="min-w-0 flex-1 text-left"
+                title="Télécharger"
+              >
+                <b className="block truncate text-sm text-brand-700 hover:underline">{p.nom}</b>
+                <small className="text-[11px] text-muted-ink">
+                  {taille(p.taille)} · {fmtDateTime(p.date)}
+                  {p.ajoute_par ? ` · ${p.ajoute_par}` : ""}
+                </small>
+              </button>
+              <button
+                onClick={() => downloadPiece(courrierId, p).catch(() => notify("Téléchargement impossible", "error"))}
+                aria-label={`Télécharger ${p.nom}`}
+                className="icon-btn size-8"
+              >
+                <Download size={14} />
+              </button>
+              {peutSupprimer(p) && (
+                <button onClick={() => setASupprimer(p)} aria-label={`Supprimer ${p.nom}`} className="icon-btn size-8 text-[#a3211a]">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ConfirmDialog
+        open={!!aSupprimer}
+        onOpenChange={(o) => !o && setASupprimer(null)}
+        danger
+        title="Supprimer cette pièce jointe ?"
+        description={`« ${aSupprimer?.nom} » sera définitivement supprimée du dossier.`}
+        confirmLabel="Supprimer"
+        onConfirm={async () => {
+          if (!aSupprimer) return;
+          try {
+            await deletePiece(courrierId, aSupprimer.id);
+            setPieces((v) => (v ?? []).filter((x) => x.id !== aSupprimer.id));
+            notify("Pièce jointe supprimée");
+          } catch (err) {
+            notify(err instanceof Error ? err.message : "Suppression impossible", "error");
+          }
+        }}
+      />
+    </section>
   );
 }
 
