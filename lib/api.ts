@@ -2,7 +2,7 @@ const API_BASE =
   (typeof import.meta !== "undefined" &&
     (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env
       ?.VITE_API_URL) ||
-  "http://127.0.0.1:8000";
+  "http://127.0.0.1:8001";
 
 const TOKEN_KEY = "courrier360-access";
 const REFRESH_KEY = "courrier360-refresh";
